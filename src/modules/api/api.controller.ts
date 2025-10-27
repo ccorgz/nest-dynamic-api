@@ -6,15 +6,6 @@ import { jsonResponse } from 'src/utils/jsonResponse';
 @Controller('v1')
 export class ApiController {
   constructor(private readonly apiService: ApiService) {}
-  @Get()
-  findAll() {
-    return this.apiService.findAll();
-  }
-
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.apiService.findOne(+id);
-  }
 
   @Get('/*all')
   async runCommand(@Param('all') all: string[], @Res() res: Response) {

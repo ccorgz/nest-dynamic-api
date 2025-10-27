@@ -9,29 +9,60 @@ export class ApiService {
     private readonly returnJsonService: ReturnJsonService,
   ) {}
 
-  async findAll() {
-    const db = this.mongoService.getDb('sample_mflix');
-    const users = await db.collection('users').find().toArray();
-    console.log('users :', users);
-    return users;
-  }
-
-  findOne(id: number) {
-    return `This action returns a #${id} api`;
-  }
-
   async runCommand(methodPath: string) {
-    const baseQuery = await this.mongoService
+    const baseMethod = await this.mongoService
       .getDb('dynamic-db')
       .collection('api')
       .findOne({ path: methodPath });
 
-    if (baseQuery?.active == false) {
+    if (baseMethod?.active == false) {
       return this.returnJsonService.error.notFound(null);
     }
+    if (baseMethod?.query == '' || !baseMethod?.query) {
+      return this.returnJsonService.error.internal(
+        null,
+        'Invalid Method. No Query Defined',
+      );
+    }
 
-    return baseQuery
-      ? this.returnJsonService.success(baseQuery)
-      : this.returnJsonService.error.notFound('Method Not Found');
+    type FilterValue =
+      | string
+      | number
+      | boolean
+      | Array<string | number | boolean>;
+    type Filters = Record<string, { [op: string]: FilterValue }>;
+
+    const filters: Filters = {};
+
+    if (baseMethod?.query && typeof baseMethod.query === 'string') {
+      for (const f of baseMethod.query.split(',')) {
+        const parts = f.split(':');
+        if (parts.length !== 3) continue;
+
+        const [field, op, rawValue] = parts;
+        if (!field || !op) continue;
+
+        const value =
+          rawValue === 'true'
+            ? true
+            : rawValue === 'false'
+              ? false
+              : !isNaN(Number(rawValue))
+                ? Number(rawValue)
+                : rawValue;
+
+        filters[field] = { [`$${op}`]: value };
+      }
+    }
+
+    const result = await this.mongoService
+      .getDb('dynamic-db')
+      .collection('api')
+      .find(filters)
+      .toArray();
+
+    return result
+      ? this.returnJsonService.success(result)
+      : this.returnJsonService.error.notFound([], 'No Data Could Be Retrieved');
   }
 }
